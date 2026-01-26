@@ -1,0 +1,9 @@
+Notes and next steps:
+- Replace public/logo.png and placeholder images with real assets.
+- Improve admin dashboard: add CRUD UI for listings, image uploads, and theme editor.
+- Consider using next-auth or a production-ready session library for auth.
+- Use Vercel environment variables for deployment:
+  - MONGODB_URI
+  - JWT_SECRET
+  - ADMIN_EMAIL
+  - ADMIN_PASSWORD
