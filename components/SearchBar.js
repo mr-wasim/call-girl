@@ -1,73 +1,119 @@
+import { useRouter } from "next/router"
+import { useState } from "react"
+
 export default function SearchBar() {
+  const router = useRouter()
+  const [city, setCity] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  function handleSearch() {
+    if (!city.trim()) {
+      alert("Please enter a city")
+      return
+    }
+
+    const slug = city.toLowerCase().replace(/\s+/g, "-")
+    setLoading(true)
+    router.push(`/location/${slug}`)
+  }
+
+  function handleListNow() {
+    const loggedIn =
+      typeof window !== "undefined" &&
+      localStorage.getItem("advertiser_token")
+
+    router.push(loggedIn ? "/admin/dashboeard" : "/AdvertiserRegister")
+  }
+
   return (
-    <div className="px-6 py-10">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <section className="px-4 sm:px-6 lg:px-10 py-8 sm:py-10">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
 
-        {/* LEFT BOX */}
-        <div className="relative rounded-lg bg-[#2b2b2b] px-6 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_25px_rgba(0,0,0,0.6)] overflow-hidden">
-
-          {/* subtle grain */}
+        {/* ---------------- LEFT CARD ---------------- */}
+        <div className="relative rounded-xl bg-[#2b2b2b] p-5 sm:p-6 lg:p-7 overflow-hidden shadow-lg">
           <div className="absolute inset-0 opacity-20 bg-[url('/texture.png')] pointer-events-none" />
 
           <div className="relative z-10">
-            <h3 className="text-[26px] font-semibold mb-4 text-white">
+            <h3 className="text-xl sm:text-2xl font-semibold mb-4 text-white">
               Find an escort
             </h3>
 
-            {/* INPUT */}
-            <div className="flex mb-4">
-              <div className="flex items-center bg-white px-4 rounded-l-md text-gray-500">
+            {/* INPUT GROUP */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 mb-4">
+              <div className="flex items-center bg-white px-4 rounded-md sm:rounded-l-md sm:rounded-r-none text-gray-600">
                 📍
               </div>
+
               <input
-                className="flex-1 px-3 py-3 text-[15px] text-black outline-none"
-                placeholder="Your City"
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSearch()}
+                className="
+                  flex-1 px-3 py-3
+                  text-black text-sm sm:text-base
+                  outline-none
+                  rounded-md sm:rounded-none
+                "
+                placeholder="Enter your city"
               />
-              <button className="bg-[#f3bc1b] px-6 rounded-r-md text-black font-semibold flex items-center gap-1">
-                Go <span className="text-lg">›</span>
+
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                className="
+                  bg-[#f3bc1b] text-black font-semibold
+                  px-6 py-3
+                  rounded-md sm:rounded-r-md sm:rounded-l-none
+                  hover:bg-[#e6b318]
+                  transition
+                  disabled:opacity-60
+                "
+              >
+                {loading ? "Searching…" : "Go ›"}
               </button>
             </div>
 
-            {/* TEXT */}
-            <p className="text-[13px] leading-relaxed text-gray-300">
-              Our goal is to help you find the right escort for you, right now!
-              Massage Republic provides listings of providers of massage and
-              other services. Not looking for a female escort? Click here for{" "}
-              <span className="text-[#f3bc1b] underline cursor-pointer">
-                male escorts
-              </span>{" "}
-              or{" "}
-              <span className="text-[#f3bc1b] underline cursor-pointer">
-                shemale escorts
-              </span>.
+            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+              Find verified escorts available in your city, updated daily for
+              accuracy and safety.
             </p>
           </div>
         </div>
 
-        {/* RIGHT BOX */}
-        <div className="relative rounded-lg bg-[#2b2b2b] px-6 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_25px_rgba(0,0,0,0.6)] overflow-hidden">
-
-          {/* grain */}
+        {/* ---------------- RIGHT CARD ---------------- */}
+        <div className="relative rounded-xl bg-[#2b2b2b] p-5 sm:p-6 lg:p-7 overflow-hidden shadow-lg">
           <div className="absolute inset-0 opacity-20 bg-[url('/texture.png')] pointer-events-none" />
 
-          <div className="relative z-10">
-            <h3 className="text-[26px] font-semibold mb-3 text-white">
-              Individual escort or agency?
-            </h3>
+          <div className="relative z-10 h-full flex flex-col justify-between">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-semibold mb-3 text-white">
+                Individual escort or agency?
+              </h3>
 
-            <p className="text-[13px] leading-relaxed text-gray-300 mb-5">
-              A basic listing on the website is <b>free!</b> Don’t worry if you
-              don’t see your city on the left or below – it will appear when
-              you list!
-            </p>
+              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed mb-6">
+                A basic listing on the platform is <b>100% free</b>.  
+                Your city will automatically appear once you list.
+              </p>
+            </div>
 
-            <button className="bg-[#f3bc1b] px-6 py-2.5 rounded-md text-black font-semibold flex items-center gap-1">
+            <button
+              onClick={handleListNow}
+              className="
+                w-full sm:w-auto
+                bg-[#f3bc1b] text-black font-semibold
+                px-6 py-3
+                rounded-md
+                hover:bg-[#e6b318]
+                transition
+                flex items-center justify-center gap-2
+              "
+            >
               List now <span className="text-lg">›</span>
             </button>
           </div>
         </div>
 
       </div>
-    </div>
+    </section>
   )
 }

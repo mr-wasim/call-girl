@@ -1,0 +1,36 @@
+{
+  "primaryColor": [
+    "#111827"
+  ],
+  "textColor": [
+    "#0f172a"
+  ],
+  "headerBg": [
+    "#ffffff"
+  ],
+  "headerText": [
+    "#111827"
+  ],
+  "heroBg": [
+    "#f8fafc"
+  ],
+  "heroText": [
+    "#0f172a"
+  ],
+  "buttonBg": [
+    "#f59e0b"
+  ],
+  "buttonText": [
+    "#000000"
+  ],
+  "linkColor": [
+    "#0ea5e9"
+  ],
+  "heroTitle": [
+    "Welcome to Your Store"
+  ],
+  "heroCta": [
+    "Get Started"
+  ],
+  "logoUrl": null
+}
