@@ -1,4 +1,4 @@
-import dbConnect from "../../../lib/dbConnect";
+import dbConnect from "../../../lib/db";
 import User from "../../../models/User";
 import { hashPassword } from "../../../lib/authUtils";
 
