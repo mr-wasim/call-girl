@@ -1,6 +1,23 @@
+/* styles/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* CSS variables - default values tuned to your original dark theme */
+:root {
+  --primary-color: #111827;
+  --text-color: #f3f4f6;
+  --header-bg: #000000;
+  --header-text: #ffffff;
+  --accent-color: #f3bc1b;
+  --body-bg: #333333;
+  --footer-bg: #1f1f1f;
+  --footer-text: #d1d5db;
+  --footer-muted: #9ca3af;
+  --border-radius: 0.375rem;
+  --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont;
+  --muted-btn-bg: rgba(255,255,255,0.06);
+}
 
 /* full height */
 html,
@@ -9,21 +26,72 @@ body,
   height: 100%;
 }
 
-/* PAGE BACKGROUND */
+/* PAGE BACKGROUND - keep texture */
 body {
-  background-color: #333;
+  background-color: var(--body-bg);
   background-image: url("/texture.png");
   background-repeat: repeat;
   background-position: top left;
   background-size: auto;
-  color: #f3f4f6;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont;
+  color: var(--text-color);
+  font-family: var(--font-family);
 }
 
-/* container helper */
+/* Header and Footer class fallbacks */
+.site-header {
+  background: var(--header-bg);
+  color: var(--header-text);
+}
+.site-footer {
+  background: var(--footer-bg);
+  color: var(--footer-text);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  border-radius: var(--border-radius);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border: 1px solid transparent;
+}
+
+.btn-accent {
+  background: var(--accent-color);
+  color: black;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--primary-color);
+}
+
+/* Cards + typography */
+.card {
+  background: rgba(255,255,255,0.02);
+  border-radius: calc(var(--border-radius));
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+}
+
+/* Utility container (your project had container-w) */
 .container-w {
-  max-width: 1180px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
+/* Tailwind compatibility safety */
+*, *::before, *::after {
+  box-sizing: border-box;
+}

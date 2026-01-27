@@ -1,377 +1,303 @@
 // pages/admin/settings.js
-import { useEffect, useRef, useState } from 'react'
-import Sidebar from '../../components/Sidebar' // keep your component
+import { useEffect, useState } from "react";
+import Sidebar from "../../components/Sidebar"; // keep your Sidebar
+import Head from "next/head";
+
 const DEFAULTS = {
-  primaryColor: '#111827',
-  textColor: '#0f172a',
-  headerBg: '#ffffff',
-  headerText: '#111827',
-  heroBg: '#f8fafc',
-  heroText: '#0f172a',
-  buttonBg: '#f59e0b',
-  buttonText: '#000000',
-  linkColor: '#0ea5e9',
-  heroTitle: 'Welcome to Your Store',
-  heroCta: 'Get Started'
-}
+  primaryColor: "#111827",
+  textColor: "#f3f4f6",
+  headerBg: "#000000",
+  headerText: "#ffffff",
+  accentColor: "#f3bc1b",
+  bodyBg: "#333333",
+  footerBg: "#1f1f1f",
+  footerText: "#d1d5db",
+  fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont",
+  borderRadius: "0.375rem",
+};
 
-export default function AdminSettingsPage() {
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const [primaryColor, setPrimaryColor] = useState(DEFAULTS.primaryColor)
-  const [textColor, setTextColor] = useState(DEFAULTS.textColor)
-  const [headerBg, setHeaderBg] = useState(DEFAULTS.headerBg)
-  const [headerText, setHeaderText] = useState(DEFAULTS.headerText)
-  const [heroBg, setHeroBg] = useState(DEFAULTS.heroBg)
-  const [heroText, setHeroText] = useState(DEFAULTS.heroText)
-  const [buttonBg, setButtonBg] = useState(DEFAULTS.buttonBg)
-  const [buttonText, setButtonText] = useState(DEFAULTS.buttonText)
-  const [linkColor, setLinkColor] = useState(DEFAULTS.linkColor)
-
-  const [heroTitle, setHeroTitle] = useState(DEFAULTS.heroTitle)
-  const [heroCta, setHeroCta] = useState(DEFAULTS.heroCta)
-
-  const [logoFile, setLogoFile] = useState(null)
-  const [logoPreview, setLogoPreview] = useState(null)
-
-  const fileRef = useRef(null)
-  const esRef = useRef(null)
+export default function AdminSettings() {
+  const [settings, setSettings] = useState(DEFAULTS);
+  const [original, setOriginal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    fetchSettings()
-    // subscribe to server-sent events so admin UI updates when broadcasts happen
-    const es = new EventSource('/api/subscribe')
-    es.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data)
-        // update local state to reflect authoritative server state
-        setPrimaryColor(data.primaryColor || DEFAULTS.primaryColor)
-        setTextColor(data.textColor || DEFAULTS.textColor)
-        setHeaderBg(data.headerBg || DEFAULTS.headerBg)
-        setHeaderText(data.headerText || DEFAULTS.headerText)
-        setHeroBg(data.heroBg || DEFAULTS.heroBg)
-        setHeroText(data.heroText || DEFAULTS.heroText)
-        setButtonBg(data.buttonBg || DEFAULTS.buttonBg)
-        setButtonText(data.buttonText || DEFAULTS.buttonText)
-        setLinkColor(data.linkColor || DEFAULTS.linkColor)
-        setHeroTitle(data.heroTitle || DEFAULTS.heroTitle)
-        setHeroCta(data.heroCta || DEFAULTS.heroCta)
-        setLogoPreview(data.logoUrl || null)
-      } catch (e) {
-        // ignore parse errors
-      }
-    }
-    es.onerror = () => {
-      // reconnects automatically in EventSource
-    }
-    esRef.current = es
-    return () => {
-      es.close()
-      if (logoPreview && logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    fetchSettings();
+    // cleanup BroadcastChannel if used here (none created permanently)
+  }, []);
+
+  useEffect(() => {
+    // apply to document for live preview in admin
+    applyToDocument(settings);
+  }, [settings]);
 
   async function fetchSettings() {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await fetch('/api/admin/sections')
-      if (!res.ok) throw new Error('fetch failed')
-      const j = await res.json()
-      setPrimaryColor(j.primaryColor || DEFAULTS.primaryColor)
-      setTextColor(j.textColor || DEFAULTS.textColor)
-      setHeaderBg(j.headerBg || DEFAULTS.headerBg)
-      setHeaderText(j.headerText || DEFAULTS.headerText)
-      setHeroBg(j.heroBg || DEFAULTS.heroBg)
-      setHeroText(j.heroText || DEFAULTS.heroText)
-      setButtonBg(j.buttonBg || DEFAULTS.buttonBg)
-      setButtonText(j.buttonText || DEFAULTS.buttonText)
-      setLinkColor(j.linkColor || DEFAULTS.linkColor)
-      setHeroTitle(j.heroTitle || DEFAULTS.heroTitle)
-      setHeroCta(j.heroCta || DEFAULTS.heroCta)
-
-      if (j.logoUrl) {
-        setLogoPreview(j.logoUrl)
-        setLogoFile(null)
+      const res = await fetch("/api/admin/settings");
+      const j = await res.json();
+      if (j?.ok && j.settings) {
+        const s = j.settings._doc ? j.settings._doc : j.settings;
+        const normalized = { ...DEFAULTS, ...s };
+        setSettings(normalized);
+        setOriginal(normalized);
       } else {
-        setLogoPreview(null)
-        setLogoFile(null)
+        setSettings(DEFAULTS);
+        setOriginal(DEFAULTS);
       }
-      setMsg('')
     } catch (e) {
-      console.error(e)
-      setMsg('Could not load settings')
+      console.error("fetchSettings error", e);
+      setSettings(DEFAULTS);
+      setOriginal(DEFAULTS);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  function onLogoChange(e) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    if (!f.type.startsWith('image/')) {
-      setMsg('Please select an image file')
-      return
-    }
-    try { if (logoPreview && logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview) } catch {}
-    const url = URL.createObjectURL(f)
-    setLogoFile(f)
-    setLogoPreview(url)
+  function applyToDocument(s) {
+    if (!s || typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.style.setProperty("--primary-color", s.primaryColor);
+    root.style.setProperty("--text-color", s.textColor);
+    root.style.setProperty("--header-bg", s.headerBg);
+    root.style.setProperty("--header-text", s.headerText);
+    root.style.setProperty("--accent-color", s.accentColor);
+    root.style.setProperty("--body-bg", s.bodyBg);
+    root.style.setProperty("--footer-bg", s.footerBg);
+    root.style.setProperty("--footer-text", s.footerText);
+    root.style.setProperty("--border-radius", s.borderRadius);
+    root.style.setProperty("--font-family", s.fontFamily);
   }
 
-  async function save() {
-    setSaving(true)
-    setMsg('')
+  function updateField(key, value) {
+    setSettings((p) => ({ ...p, [key]: value }));
+  }
+
+  // helper to broadcast saved settings to other tabs/windows
+  function broadcastTheme(themeObj) {
     try {
-      if (logoFile) {
-        const fd = new FormData()
-        fd.append('primaryColor', primaryColor)
-        fd.append('textColor', textColor)
-        fd.append('headerBg', headerBg)
-        fd.append('headerText', headerText)
-        fd.append('heroBg', heroBg)
-        fd.append('heroText', heroText)
-        fd.append('buttonBg', buttonBg)
-        fd.append('buttonText', buttonText)
-        fd.append('linkColor', linkColor)
-        fd.append('heroTitle', heroTitle)
-        fd.append('heroCta', heroCta)
-        fd.append('logo', logoFile, logoFile.name)
-        const res = await fetch('/api/admin/update-sections', { method: 'POST', body: fd })
-        const j = await res.json().catch(() => ({}))
-        if (res.ok) {
-          setMsg('Saved successfully — changes broadcasted')
-          setLogoFile(null)
-          if (j.logoUrl) setLogoPreview(j.logoUrl)
-        } else setMsg(j?.message || 'Save failed')
-      } else {
-        const payload = {
-          primaryColor, textColor, headerBg, headerText,
-          heroBg, heroText, buttonBg, buttonText, linkColor,
-          heroTitle, heroCta
-        }
-        const res = await fetch('/api/admin/update-sections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
-        const j = await res.json().catch(() => ({}))
-        if (res.ok) {
-          setMsg('Saved successfully — changes broadcasted')
-        } else setMsg(j?.message || 'Save failed')
+      // BroadcastChannel for modern browsers
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        const bc = new BroadcastChannel("site-theme");
+        bc.postMessage(themeObj);
+        bc.close();
       }
     } catch (e) {
-      console.error(e)
-      setMsg('Save error')
+      console.warn("BroadcastChannel failed", e);
+    }
+
+    try {
+      // localStorage trick: writes cause 'storage' events in other tabs.
+      if (typeof window !== "undefined") {
+        localStorage.setItem("site_theme_updated_at", Date.now().toString());
+        localStorage.setItem("site_theme_payload", JSON.stringify(themeObj));
+      }
+    } catch (e) {
+      console.warn("localStorage broadcast failed", e);
+    }
+
+    try {
+      // dispatch custom event in current tab (so current tab also responds uniformly)
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("site-theme-updated", { detail: themeObj }));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async function saveSettings() {
+    setSaving(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        const s = j.settings._doc ? j.settings._doc : j.settings;
+        const normalized = { ...DEFAULTS, ...s };
+        setOriginal(normalized);
+        setSettings(normalized);
+
+        // Apply immediately in admin
+        applyToDocument(normalized);
+
+        // Broadcast to other tabs/windows so whole site updates instantly
+        broadcastTheme(normalized);
+
+        setMsg("Saved. Theme is now active for the site.");
+      } else {
+        setMsg("Save failed: " + (j.message || "unknown"));
+      }
+    } catch (err) {
+      console.error("saveSettings error", err);
+      setMsg("Save failed: " + (err.message || err));
     } finally {
-      setSaving(false)
+      setSaving(false);
+      setTimeout(() => setMsg(""), 4000);
     }
   }
 
   async function resetDefaults() {
-    setPrimaryColor(DEFAULTS.primaryColor)
-    setTextColor(DEFAULTS.textColor)
-    setHeaderBg(DEFAULTS.headerBg)
-    setHeaderText(DEFAULTS.headerText)
-    setHeroBg(DEFAULTS.heroBg)
-    setHeroText(DEFAULTS.heroText)
-    setButtonBg(DEFAULTS.buttonBg)
-    setButtonText(DEFAULTS.buttonText)
-    setLinkColor(DEFAULTS.linkColor)
-    setHeroTitle(DEFAULTS.heroTitle)
-    setHeroCta(DEFAULTS.heroCta)
-    setLogoFile(null)
-    setLogoPreview(null)
-    setMsg('Resetting to defaults...')
+    if (!confirm("Reset to site defaults?")) return;
+    setSaving(true);
+    setMsg("");
     try {
-      const res = await fetch('/api/admin/update-sections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...DEFAULTS, logoUrl: null })
-      })
-      if (res.ok) {
-        setMsg('Reset to defaults and broadcasted')
+      const res = await fetch("/api/admin/settings?action=reset", { method: "POST" });
+      const j = await res.json();
+      if (j.ok) {
+        const s = j.settings._doc ? j.settings._doc : j.settings;
+        const normalized = { ...DEFAULTS, ...s };
+        setSettings(normalized);
+        setOriginal(normalized);
+        applyToDocument(normalized);
+
+        // broadcast reset so other open tabs revert as well
+        broadcastTheme(normalized);
+
+        setMsg("Reset to defaults. Theme is now original site look.");
       } else {
-        const j = await res.json().catch(()=>({}))
-        setMsg(j?.message || 'Reset failed')
+        setMsg("Reset failed: " + (j.message || "unknown"));
       }
-    } catch (e) {
-      console.error(e)
-      setMsg('Reset error')
+    } catch (err) {
+      console.error("resetDefaults error", err);
+      setMsg("Reset failed: " + (err.message || err));
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMsg(""), 4000);
     }
   }
 
-  const previewStyle = {
-    '--primary': primaryColor,
-    '--text': textColor,
-    '--header-bg': headerBg,
-    '--header-text': headerText,
-    '--hero-bg': heroBg,
-    '--hero-text': heroText,
-    '--btn-bg': buttonBg,
-    '--btn-text': buttonText,
-    '--link': linkColor
+  function revert() {
+    if (original) setSettings(original);
   }
 
+  if (loading) return <div className="p-6">Loading settings...</div>;
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-50 dark:bg-zinc-900 text-slate-900 dark:text-slate-100">
-      <Sidebar />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold">Site Appearance & Settings</h1>
-                <p className="text-sm text-zinc-500">Customize global colors, hero, and logo. Live preview and broadcast to live site.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => {
-                  navigator.clipboard.writeText(Object.entries({
-                    primaryColor, textColor, headerBg, headerText, heroBg, heroText, buttonBg, buttonText, linkColor
-                  }).map(([k,v]) => `--${k}:${v};`).join('\n')).then(()=>setMsg('CSS copied')).catch(()=>setMsg('copy failed'))
-                }} className="px-3 py-1 text-sm rounded bg-zinc-100 dark:bg-zinc-700">Copy CSS</button>
-                <button onClick={resetDefaults} className="px-3 py-1 text-sm rounded bg-red-100 text-red-700">Reset</button>
-              </div>
-            </div>
+    <>
+      <Head><title>Admin Settings</title></Head>
+      <div className="min-h-screen flex">
+        <Sidebar />
+        <main className="flex-1 p-6">
+          <h1 className="text-2xl font-semibold mb-4">Site Settings</h1>
 
-            <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow space-y-4">
-              <h3 className="text-sm font-medium">Brand & Logo</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-28 h-16 rounded overflow-hidden bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center">
-                  {logoPreview ? (
-                    <img src={logoPreview} alt="logo" className="w-full h-full object-contain p-1" />
-                  ) : (
-                    <div className="text-xs text-zinc-500">No logo</div>
-                  )}
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-medium mb-3">Theme Editor</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Primary Color */}
                 <div>
-                  <input ref={fileRef} type="file" accept="image/*" onChange={onLogoChange} className="hidden" />
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-1 rounded bg-black text-white text-sm">Upload Logo</button>
-                    <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null) }} className="px-3 py-1 rounded bg-zinc-100 text-sm">Remove</button>
+                  <label className="block text-sm font-medium mb-1">Primary Color</label>
+                  <input type="color" value={settings.primaryColor} onChange={(e)=>updateField('primaryColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.primaryColor} onChange={(e)=>updateField('primaryColor', e.target.value)} />
+                </div>
+
+                {/* Accent */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Accent Color</label>
+                  <input type="color" value={settings.accentColor} onChange={(e)=>updateField('accentColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.accentColor} onChange={(e)=>updateField('accentColor', e.target.value)} />
+                </div>
+
+                {/* Header bg */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Header Background</label>
+                  <input type="color" value={settings.headerBg} onChange={(e)=>updateField('headerBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.headerBg} onChange={(e)=>updateField('headerBg', e.target.value)} />
+                </div>
+
+                {/* Header text */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Header Text Color</label>
+                  <input type="color" value={settings.headerText} onChange={(e)=>updateField('headerText', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.headerText} onChange={(e)=>updateField('headerText', e.target.value)} />
+                </div>
+
+                {/* Site text color */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Site Text Color</label>
+                  <input type="color" value={settings.textColor} onChange={(e)=>updateField('textColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.textColor} onChange={(e)=>updateField('textColor', e.target.value)} />
+                </div>
+
+                {/* Body background */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Body Background</label>
+                  <input type="color" value={settings.bodyBg} onChange={(e)=>updateField('bodyBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.bodyBg} onChange={(e)=>updateField('bodyBg', e.target.value)} />
+                </div>
+
+                {/* Footer bg */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Footer Background</label>
+                  <input type="color" value={settings.footerBg} onChange={(e)=>updateField('footerBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.footerBg} onChange={(e)=>updateField('footerBg', e.target.value)} />
+                </div>
+
+                {/* Footer text */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Footer Text Color</label>
+                  <input type="color" value={settings.footerText} onChange={(e)=>updateField('footerText', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
+                  <input className="ml-3 border rounded px-2 py-1" value={settings.footerText} onChange={(e)=>updateField('footerText', e.target.value)} />
+                </div>
+
+                {/* Font & border radius */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Font Family</label>
+                  <input className="w-full border rounded px-3 py-2" value={settings.fontFamily} onChange={(e)=>updateField('fontFamily', e.target.value)} />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Border Radius (CSS)</label>
+                  <input className="w-full border rounded px-3 py-2" value={settings.borderRadius} onChange={(e)=>updateField('borderRadius', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button onClick={saveSettings} disabled={saving} className="px-4 py-2 rounded-lg shadow-sm bg-blue-600 text-white">
+                  {saving ? "Saving..." : "Save"}
+                </button>
+
+                <button onClick={revert} className="px-4 py-2 rounded-lg border">Revert</button>
+
+                <button onClick={resetDefaults} className="px-4 py-2 rounded-lg border text-red-600">Reset to Defaults</button>
+
+                <div className="ml-auto text-sm text-gray-500">{msg}</div>
+              </div>
+            </section>
+
+            <aside className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-medium mb-3">Live Preview (Admin only)</h2>
+
+              <div className="border rounded-lg overflow-hidden" style={{ borderRadius: settings.borderRadius }}>
+                <div style={{ padding: "12px 16px", background: settings.headerBg, color: settings.headerText, fontFamily: settings.fontFamily }}>
+                  <strong>MySite</strong> — header
+                </div>
+
+                <div style={{ background: settings.bodyBg, color: settings.textColor, padding: 16, fontFamily: settings.fontFamily }}>
+                  <h3 style={{ color: settings.primaryColor }}>Title / Primary color</h3>
+                  <p>This is a live preview of the website theme. Buttons, accent color, and text reflect your settings.</p>
+
+                  <div className="mt-4" style={{ display: "flex", gap: 8 }}>
+                    <button style={{ background: settings.primaryColor, color: "#fff", padding: "8px 12px", borderRadius: settings.borderRadius, border: "none" }}>Primary</button>
+                    <button style={{ background: settings.accentColor, color: "#000", padding: "8px 12px", borderRadius: settings.borderRadius, border: "none" }}>Accent</button>
+                    <button style={{ background: "transparent", color: settings.textColor, padding: "8px 12px", borderRadius: settings.borderRadius, border: `1px solid ${settings.primaryColor}` }}>Ghost</button>
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">PNG / JPG recommended. Max 2MB.</div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow space-y-4">
-              <h3 className="text-sm font-medium">Colors</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Primary</span>
-                  <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Text</span>
-                  <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Header Bg</span>
-                  <input type="color" value={headerBg} onChange={e => setHeaderBg(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Header Text</span>
-                  <input type="color" value={headerText} onChange={e => setHeaderText(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Hero Bg</span>
-                  <input type="color" value={heroBg} onChange={e => setHeroBg(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Hero Text</span>
-                  <input type="color" value={heroText} onChange={e => setHeroText(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Button</span>
-                  <input type="color" value={buttonBg} onChange={e => setButtonBg(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-zinc-500 mb-1">Button Text</span>
-                  <input type="color" value={buttonText} onChange={e => setButtonText(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-                <label className="flex flex-col md:col-span-2">
-                  <span className="text-xs text-zinc-500 mb-1">Link Color</span>
-                  <input type="color" value={linkColor} onChange={e => setLinkColor(e.target.value)} className="w-full h-10 p-0 border-0" />
-                </label>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow space-y-4">
-              <h3 className="text-sm font-medium">Hero / Landing Content</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Hero Title</label>
-                  <input className="input w-full" value={heroTitle} onChange={e => setHeroTitle(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Hero CTA</label>
-                  <input className="input w-full" value={heroCta} onChange={e => setHeroCta(e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={save} disabled={saving} className="px-4 py-2 rounded bg-black text-white hover:bg-amber-400 hover:text-black transition">
-                {saving ? 'Saving...' : 'Save Settings'}
-              </button>
-              <button onClick={() => fetchSettings()} disabled={loading} className="px-4 py-2 rounded bg-zinc-100 dark:bg-zinc-700">Reload</button>
-              {msg && <div className="text-sm text-zinc-500">{msg}</div>}
-            </div>
+              <div className="mt-4 text-xs text-gray-500">Tip: Changes update live in this preview. Click Save to make them persistent for the site.</div>
+            </aside>
           </div>
-
-          <aside className="hidden md:block">
-            <div className="sticky top-6">
-              <div className="rounded-lg overflow-hidden border dark:border-zinc-700 shadow" style={previewStyle}>
-                <header style={{ background: headerBg, color: headerText }} className="px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-8 bg-white rounded overflow-hidden flex items-center justify-center">
-                      {logoPreview ? <img src={logoPreview} alt="logo" className="object-contain w-full h-full" /> : <div className="text-xs">LOGO</div>}
-                    </div>
-                    <div style={{ color: headerText }} className="font-semibold">Admin Demo</div>
-                  </div>
-                  <nav className="flex items-center gap-3">
-                    <a style={{ color: linkColor }} className="text-sm">Home</a>
-                    <a style={{ color: linkColor }} className="text-sm">Listings</a>
-                    <a style={{ color: linkColor }} className="text-sm">Contact</a>
-                  </nav>
-                </header>
-
-                <section style={{ background: heroBg, color: heroText }} className="p-6">
-                  <h2 className="text-lg font-bold" style={{ color: heroText }}>{heroTitle}</h2>
-                  <p className="text-sm mt-2" style={{ color: heroText }}>This is a live preview — text and colors reflect your choices.</p>
-                  <div className="mt-4">
-                    <button style={{ background: buttonBg, color: buttonText }} className="px-4 py-2 rounded shadow">
-                      {heroCta}
-                    </button>
-                  </div>
-                </section>
-
-                <div className="p-4" style={{ color: textColor }}>
-                  <h3 className="font-semibold">Sample content</h3>
-                  <p className="text-sm mt-2">Paragraph text uses your <strong>text color</strong>. Links use <span style={{ color: linkColor }}>link color</span>.</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="p-3 border rounded" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-                      <div className="text-xs">Card</div>
-                      <div className="font-medium">Example</div>
-                    </div>
-                    <div className="p-3 border rounded" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-                      <div className="text-xs">Card</div>
-                      <div className="font-medium">Example</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 text-xs text-zinc-500">
-                Preview uses inline styles and won't persist — press Save to store changes (and broadcast to live site).
-              </div>
-            </div>
-          </aside>
-        </div>
-      </main>
-    </div>
-  )
+        </main>
+      </div>
+    </>
+  );
 }
