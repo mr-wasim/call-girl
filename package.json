@@ -13,7 +13,7 @@
     "bcryptjs": "2.4.3",
     "cookie": "0.5.0",
     "dotenv": "^17.2.3",
-    "formidable": "^3.5.4",
+    "formidable": "^2.1.5",
     "jsonwebtoken": "9.0.0",
     "lucide-react": "^0.563.0",
     "mongodb": "5.7.0",

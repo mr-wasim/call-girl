@@ -1,5 +1,5 @@
 // pages/admin/settings.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Sidebar from "../../components/Sidebar"; // keep your Sidebar
 import Head from "next/head";
 
@@ -14,6 +14,7 @@ const DEFAULTS = {
   footerText: "#d1d5db",
   fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont",
   borderRadius: "0.375rem",
+  logoPath: "/logo.png",
 };
 
 export default function AdminSettings() {
@@ -22,10 +23,10 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const fileRef = useRef(null);
 
   useEffect(() => {
     fetchSettings();
-    // cleanup BroadcastChannel if used here (none created permanently)
   }, []);
 
   useEffect(() => {
@@ -75,47 +76,99 @@ export default function AdminSettings() {
     setSettings((p) => ({ ...p, [key]: value }));
   }
 
-  // helper to broadcast saved settings to other tabs/windows
+  // file upload handler
+  async function handleUploadFile(file) {
+    if (!file) return null;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload-logo", {
+        method: "POST",
+        body: fd,
+      });
+      const j = await res.json();
+      if (j.ok && j.path) {
+        // set the logoPath to returned public path
+        updateField("logoPath", j.path);
+        return j.path;
+      } else {
+        throw new Error(j.message || "Upload failed");
+      }
+    } catch (err) {
+      console.error("upload failed", err);
+      alert("Upload failed: " + (err.message || err));
+      return null;
+    }
+  }
+
+  // onChange file input
+  async function onFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    // preview locally: create object url (optional)
+    const objectUrl = URL.createObjectURL(file);
+    updateField("logoPath", objectUrl); // show preview immediately
+    // upload file to server
+    const uploadedPath = await handleUploadFile(file);
+    if (uploadedPath) {
+      updateField("logoPath", uploadedPath);
+      setMsg("Logo uploaded (saved after you click Save).");
+      setTimeout(()=>setMsg(""), 3000);
+    } else {
+      // if upload failed, revert preview
+      const orig = original?.logoPath || DEFAULTS.logoPath;
+      updateField("logoPath", orig);
+    }
+    // clear file input
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  // allow entering URL
+  function onLogoUrlChange(e) {
+    updateField("logoPath", e.target.value);
+  }
+
+  // remove / reset logo to default
+  function resetLogoToDefault() {
+    const def = DEFAULTS.logoPath;
+    updateField("logoPath", def);
+    setMsg("Logo reset locally. Click Save to make it permanent.");
+    setTimeout(()=>setMsg(""), 3000);
+  }
+
+  // broadcast helper: same as before
   function broadcastTheme(themeObj) {
     try {
-      // BroadcastChannel for modern browsers
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
         const bc = new BroadcastChannel("site-theme");
         bc.postMessage(themeObj);
         bc.close();
       }
-    } catch (e) {
-      console.warn("BroadcastChannel failed", e);
-    }
+    } catch (e) { /* ignore */ }
 
     try {
-      // localStorage trick: writes cause 'storage' events in other tabs.
       if (typeof window !== "undefined") {
         localStorage.setItem("site_theme_updated_at", Date.now().toString());
         localStorage.setItem("site_theme_payload", JSON.stringify(themeObj));
       }
-    } catch (e) {
-      console.warn("localStorage broadcast failed", e);
-    }
+    } catch (e) {}
 
     try {
-      // dispatch custom event in current tab (so current tab also responds uniformly)
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("site-theme-updated", { detail: themeObj }));
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   async function saveSettings() {
     setSaving(true);
     setMsg("");
     try {
+      const payload = { ...settings };
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
       const j = await res.json();
       if (j.ok) {
@@ -124,22 +177,22 @@ export default function AdminSettings() {
         setOriginal(normalized);
         setSettings(normalized);
 
-        // Apply immediately in admin
+        // apply now
         applyToDocument(normalized);
 
-        // Broadcast to other tabs/windows so whole site updates instantly
+        // broadcast to other tabs
         broadcastTheme(normalized);
 
-        setMsg("Saved. Theme is now active for the site.");
+        setMsg("Saved. Theme and logo are now active for the site.");
       } else {
         setMsg("Save failed: " + (j.message || "unknown"));
       }
     } catch (err) {
-      console.error("saveSettings error", err);
+      console.error("save error", err);
       setMsg("Save failed: " + (err.message || err));
     } finally {
       setSaving(false);
-      setTimeout(() => setMsg(""), 4000);
+      setTimeout(()=>setMsg(""), 4000);
     }
   }
 
@@ -156,20 +209,17 @@ export default function AdminSettings() {
         setSettings(normalized);
         setOriginal(normalized);
         applyToDocument(normalized);
-
-        // broadcast reset so other open tabs revert as well
         broadcastTheme(normalized);
-
-        setMsg("Reset to defaults. Theme is now original site look.");
+        setMsg("Reset to defaults. Theme and logo reset to original.");
       } else {
         setMsg("Reset failed: " + (j.message || "unknown"));
       }
     } catch (err) {
-      console.error("resetDefaults error", err);
+      console.error("reset error", err);
       setMsg("Reset failed: " + (err.message || err));
     } finally {
       setSaving(false);
-      setTimeout(() => setMsg(""), 4000);
+      setTimeout(()=>setMsg(""), 4000);
     }
   }
 
@@ -189,66 +239,54 @@ export default function AdminSettings() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <section className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-medium mb-3">Theme Editor</h2>
+              <h2 className="text-lg font-medium mb-3">Theme & Logo Editor</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Primary Color */}
+              {/* theme inputs (same as before) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Primary Color</label>
+                  <label className="block text-sm font-medium mb-1 ">Primary Color</label>
                   <input type="color" value={settings.primaryColor} onChange={(e)=>updateField('primaryColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.primaryColor} onChange={(e)=>updateField('primaryColor', e.target.value)} />
                 </div>
-
-                {/* Accent */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Accent Color</label>
                   <input type="color" value={settings.accentColor} onChange={(e)=>updateField('accentColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.accentColor} onChange={(e)=>updateField('accentColor', e.target.value)} />
                 </div>
-
-                {/* Header bg */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Header Background</label>
                   <input type="color" value={settings.headerBg} onChange={(e)=>updateField('headerBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.headerBg} onChange={(e)=>updateField('headerBg', e.target.value)} />
                 </div>
-
-                {/* Header text */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Header Text Color</label>
                   <input type="color" value={settings.headerText} onChange={(e)=>updateField('headerText', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.headerText} onChange={(e)=>updateField('headerText', e.target.value)} />
                 </div>
 
-                {/* Site text color */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Site Text Color</label>
                   <input type="color" value={settings.textColor} onChange={(e)=>updateField('textColor', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.textColor} onChange={(e)=>updateField('textColor', e.target.value)} />
                 </div>
-
-                {/* Body background */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Body Background</label>
                   <input type="color" value={settings.bodyBg} onChange={(e)=>updateField('bodyBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.bodyBg} onChange={(e)=>updateField('bodyBg', e.target.value)} />
                 </div>
 
-                {/* Footer bg */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Footer Background</label>
                   <input type="color" value={settings.footerBg} onChange={(e)=>updateField('footerBg', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.footerBg} onChange={(e)=>updateField('footerBg', e.target.value)} />
                 </div>
 
-                {/* Footer text */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Footer Text Color</label>
                   <input type="color" value={settings.footerText} onChange={(e)=>updateField('footerText', e.target.value)} className="w-14 h-10 p-1 rounded-md" />
                   <input className="ml-3 border rounded px-2 py-1" value={settings.footerText} onChange={(e)=>updateField('footerText', e.target.value)} />
                 </div>
 
-                {/* Font & border radius */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Font Family</label>
                   <input className="w-full border rounded px-3 py-2" value={settings.fontFamily} onChange={(e)=>updateField('fontFamily', e.target.value)} />
@@ -257,6 +295,34 @@ export default function AdminSettings() {
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Border Radius (CSS)</label>
                   <input className="w-full border rounded px-3 py-2" value={settings.borderRadius} onChange={(e)=>updateField('borderRadius', e.target.value)} />
+                </div>
+              </div>
+
+              {/* LOGO controls */}
+              <div className="mb-6">
+                <h3 className="text-md font-medium mb-2">Logo</h3>
+
+                <div className="flex items-center gap-4">
+                  {/* preview */}
+                  <div style={{ width: 120, height: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", borderRadius: 6, overflow: "hidden", border: "1px solid #eee" }}>
+                    <img src={settings.logoPath || "/logo.png"} alt="logo preview" style={{ maxHeight: 46, maxWidth: "100%" }} />
+                  </div>
+
+                  {/* file upload */}
+                  <div>
+                    <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} />
+                    <div className="text-sm text-gray-500 mt-1">Upload a logo (PNG, JPG, SVG). Saved to <code>/public/uploads</code> (local/dev).</div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-sm font-medium mb-1">Or paste an image URL</label>
+                  <input className="w-full border rounded px-3 py-2" value={settings.logoPath || ""} onChange={onLogoUrlChange} placeholder="https://cdn.example.com/logo.png or /uploads/xxx.png" />
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => { updateField('logoPath', settings.logoPath); setMsg('Preview set. Click Save to persist.'); setTimeout(()=>setMsg(""),3000); }} className="px-3 py-2 border rounded">Preview</button>
+                  <button onClick={resetLogoToDefault} className="px-3 py-2 border rounded">Reset logo to default</button>
                 </div>
               </div>
 
@@ -277,7 +343,8 @@ export default function AdminSettings() {
               <h2 className="text-lg font-medium mb-3">Live Preview (Admin only)</h2>
 
               <div className="border rounded-lg overflow-hidden" style={{ borderRadius: settings.borderRadius }}>
-                <div style={{ padding: "12px 16px", background: settings.headerBg, color: settings.headerText, fontFamily: settings.fontFamily }}>
+                <div style={{ padding: "12px 16px", background: settings.headerBg, color: settings.headerText, fontFamily: settings.fontFamily, display: 'flex', alignItems:'center', gap:12 }}>
+                  <img src={settings.logoPath || "/logo.png"} alt="logo" style={{ height: 28, objectFit: 'contain' }} />
                   <strong>MySite</strong> — header
                 </div>
 

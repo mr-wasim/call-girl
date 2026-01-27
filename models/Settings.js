@@ -12,7 +12,7 @@ const SettingsSchema = new mongoose.Schema({
   footerText: { type: String, default: "#d1d5db" },
   fontFamily: { type: String, default: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont" },
   borderRadius: { type: String, default: "0.375rem" },
-  // mark if admin has actually customized the settings (false until someone saves)
+  logoPath: { type: String, default: "/logo.png" }, // <-- dynamic logo path
   customized: { type: Boolean, default: false },
 }, { timestamps: true });
 
