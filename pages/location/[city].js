@@ -1,41 +1,8 @@
-import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import FilterBar from "../../components/TopSection"
 import ListingSection from "../../components/Listings"
 
-export default function CityPage() {
-  const router = useRouter()
-  const { city } = router.query
-
-  const [listings, setListings] = useState([])
-  const [status, setStatus] = useState("loading")
-
-  useEffect(() => {
-    if (!city) return
-
-    fetch(`/api/location-listings?city=${city}`)
-      .then(res => res.json())
-      .then(json => {
-        if (json.success) {
-          setListings(json.data)
-          setStatus("data")
-        } else {
-          setStatus("coming")
-        }
-      })
-      .catch(() => setStatus("coming"))
-  }, [city])
-
-  /* ---------------- LOADING ---------------- */
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading…
-      </div>
-    )
-  }
-
+export default function CityPage({ listings, city, status }) {
   /* ---------------- COMING SOON ---------------- */
   if (status === "coming") {
     return (
@@ -58,10 +25,9 @@ export default function CityPage() {
     )
   }
 
-  /* ---------------- DATA FOUND (HOME-LIKE DESIGN) ---------------- */
+  /* ---------------- DATA FOUND ---------------- */
   return (
     <div className="container-w px-4 py-6">
-
       {/* SAME FILTER BAR AS HOME */}
       <FilterBar />
 
@@ -77,7 +43,45 @@ export default function CityPage() {
 
       {/* SAME LISTING SECTION STYLE */}
       <ListingSection data={listings} />
-
     </div>
   )
+}
+
+/* ================= SERVER SIDE ================= */
+export async function getServerSideProps(context) {
+  const { city } = context.params
+
+  try {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL || `http://${context.req.headers.host}`
+
+    const res = await fetch(`${baseUrl}/api/location-listings?city=${city}`)
+    const json = await res.json()
+
+    if (!json.success || !json.data?.length) {
+      return {
+        props: {
+          listings: [],
+          city,
+          status: "coming",
+        },
+      }
+    }
+
+    return {
+      props: {
+        listings: json.data,
+        city,
+        status: "data",
+      },
+    }
+  } catch (err) {
+    return {
+      props: {
+        listings: [],
+        city,
+        status: "coming",
+      },
+    }
+  }
 }
