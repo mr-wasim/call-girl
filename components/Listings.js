@@ -1,9 +1,24 @@
+// components/Listings.js
 import { useEffect, useState } from "react"
 import Link from "next/link"
 
+/**
+ * Deterministic date formatter so SSR and client output always match.
+ * Returns DD/MM/YYYY (zero-padded). If invalid date -> empty string.
+ */
+function formatDateISO(date) {
+  if (!date) return ""
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return ""
+  const day = String(d.getDate()).padStart(2, "0")
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
 export default function Listings({
-  data = null,          // 👈 city page se aayega
-  enablePagination = true // 👈 home page ke liye
+  data = null, // optional server-provided data
+  enablePagination = true
 }) {
   const [listings, setListings] = useState(data || [])
   const [loading, setLoading] = useState(!data)
@@ -12,7 +27,7 @@ export default function Listings({
   const [totalPages, setTotalPages] = useState(1)
   const [error, setError] = useState(null)
 
-  // 🔥 FETCH ONLY WHEN DATA NOT PROVIDED
+  // Fetch only when data not provided
   useEffect(() => {
     if (data) {
       setListings(data)
@@ -51,11 +66,13 @@ export default function Listings({
   if (error) return <div className="text-red-400 mt-6">{error}</div>
 
   return (
-    <div className="container mx-auto px-3 md:px-4">
+    <div className=" w-[100%] m-auto px-3 md:px-1">
       <div className="grid grid-cols-12 gap-6 mt-6">
-
         {/* MAIN LIST */}
         <div className="col-span-12 lg:col-span-9 space-y-6">
+          {(!listings || listings.length === 0) && (
+            <div className="text-gray-400">No listings found.</div>
+          )}
 
           {listings.map(listing => {
             const mainImage =
@@ -83,7 +100,7 @@ export default function Listings({
                   <div className="w-full sm:w-[200px] h-[220px] sm:h-[240px] overflow-hidden rounded border-2 border-[#f3bc1b]">
                     <img
                       src={mainImage}
-                      alt={listing.name}
+                      alt={listing.name || "listing"}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -98,6 +115,7 @@ export default function Listings({
                             <img
                               src={img}
                               className="w-full h-full object-cover"
+                              alt={`thumb-${i}`}
                             />
                           </div>
                         ))
@@ -115,7 +133,7 @@ export default function Listings({
                   <h2 className="text-[20px] sm:text-[24px] mb-2 font-light">
                     {listing.price || "Best Offer"}
                     <span className="ml-2 text-xs sm:text-sm bg-black/40 px-2 py-0.5 rounded">
-                      {listing.city}
+                      {listing.city || ""}
                     </span>
                   </h2>
 
@@ -133,7 +151,7 @@ export default function Listings({
                     </Link>
 
                     <span className="text-xs text-gray-300">
-                      {new Date(listing.createdAt).toLocaleDateString()}
+                      {formatDateISO(listing.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -186,10 +204,11 @@ export default function Listings({
               <img
                 src={item.profileImages?.[0] || "/placeholder.jpg"}
                 className="w-10 h-10 object-cover rounded"
+                alt={item.name || "thumb"}
               />
               <p>
                 New listing in{" "}
-                <span className="text-yellow-400">{item.city}</span>
+                <span className="text-yellow-400">{item.city || ""}</span>
               </p>
             </div>
           ))}

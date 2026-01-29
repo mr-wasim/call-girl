@@ -1,13 +1,14 @@
+// pages/location/[city].js
 import Link from "next/link"
 import FilterBar from "../../components/TopSection"
 import ListingSection from "../../components/Listings"
 
-export default function CityPage({ listings, city, status }) {
+export default function CityPage({ listings = [], city = "", status = "coming" }) {
   /* ---------------- COMING SOON ---------------- */
   if (status === "coming") {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="bg-[#1a1a1a] p-8 rounded text-center max-w-md w-full">
+      <div className="min-h-screen text-white flex items-center justify-center px-4">
+        <div className=" p-8 rounded text-center max-w-md w-full">
           <h1 className="text-3xl text-yellow-400 font-bold mb-3">
             Coming Soon 🚧
           </h1>
@@ -27,7 +28,7 @@ export default function CityPage({ listings, city, status }) {
 
   /* ---------------- DATA FOUND ---------------- */
   return (
-    <div className="container-w px-4 py-6">
+    <div className=" w-[98%] px-4 py-6 m-auto">
       {/* SAME FILTER BAR AS HOME */}
       <FilterBar />
 
@@ -37,12 +38,12 @@ export default function CityPage({ listings, city, status }) {
           Escorts in {city.replace("-", " ")}
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          Showing {listings.length} verified listings
+          Showing {Array.isArray(listings) ? listings.length : 0} verified listings
         </p>
       </div>
 
-      {/* SAME LISTING SECTION STYLE */}
-      <ListingSection data={listings} />
+      {/* LISTING SECTION */}
+      <ListingSection data={listings} enablePagination={false} />
     </div>
   )
 }
@@ -55,10 +56,10 @@ export async function getServerSideProps(context) {
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL || `http://${context.req.headers.host}`
 
-    const res = await fetch(`${baseUrl}/api/location-listings?city=${city}`)
+    const res = await fetch(`${baseUrl}/api/location-listings?city=${encodeURIComponent(city)}`)
     const json = await res.json()
 
-    if (!json.success || !json.data?.length) {
+    if (!json.success || !Array.isArray(json.data) || json.data.length === 0) {
       return {
         props: {
           listings: [],
@@ -76,6 +77,7 @@ export async function getServerSideProps(context) {
       },
     }
   } catch (err) {
+    console.error("City page SSR error:", err)
     return {
       props: {
         listings: [],
