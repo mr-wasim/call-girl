@@ -1,15 +1,16 @@
 // models/Listing.js
-import mongoose from 'mongoose'
+import mongoose from "mongoose";
 
 const ListingSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  city: { type: String, required: true },
-  age: String,
-  price: String,
-  description: String,
-  profileImages: [String], // URLs like /uploads/profile/abcd.webp
-  variantImages: [String],
-  createdAt: { type: Date, default: Date.now }
-})
+  citySlug: { type: String, required: true }, // reference by slug
+  age: { type: String },
+  price: { type: String },
+  descriptionHtml: { type: String, default: "" },
+  profileImages: [{ type: String }], // public paths
+  variantImages: [{ type: String }],
+  profileOrder: [{ type: String }], // filenames in order
+  createdBy: { type: String, default: "admin" },
+}, { timestamps: true });
 
-export default mongoose.models.Listing || mongoose.model('Listing', ListingSchema)
+export default mongoose.models.Listing || mongoose.model("Listing", ListingSchema);

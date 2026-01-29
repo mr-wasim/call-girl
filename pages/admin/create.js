@@ -2,10 +2,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Sidebar from '../../components/Sidebar'
 import RichTextEditor from '../../components/RichTextEditor'
+import Head from 'next/head'
 
-export default function AdminCreatePage() {
+export default function AdminCreatePage({ initialCities = [] }) {
     const [name, setName] = useState('')
-    const [city, setCity] = useState('')
+    const [city, setCity] = useState(initialCities?.[0]?.slug || '')
     const [age, setAge] = useState('')
     const [price, setPrice] = useState('')
     const [description, setDescription] = useState('')
@@ -18,7 +19,7 @@ export default function AdminCreatePage() {
 
     const [loading, setLoading] = useState(false)
     const [msg, setMsg] = useState('')
-
+    const [cities, setCities] = useState(initialCities || [])
 
     // cleanup objectURLs on unmount
     useEffect(() => {
@@ -27,6 +28,26 @@ export default function AdminCreatePage() {
             variantFiles.forEach(i => i.url && URL.revokeObjectURL(i.url))
         }
     }, [profileFiles, variantFiles])
+
+    // listen for city updates (admin creates a city)
+    useEffect(() => {
+      function onCitiesUpdated(e) {
+        // simplest: re-fetch cities
+        fetch('/api/admin/cities').then(r => r.json()).then(j => {
+          if (j?.ok && j.cities) {
+            setCities(j.cities)
+            if (!city && j.cities.length) setCity(j.cities[0].slug)
+          }
+        }).catch(()=>{})
+      }
+      window.addEventListener('site-cities-updated', onCitiesUpdated)
+      window.addEventListener('storage', (ev)=>{
+        if (ev.key === 'site_cities_updated_at') onCitiesUpdated()
+      })
+      return ()=>{
+        window.removeEventListener('site-cities-updated', onCitiesUpdated)
+      }
+    }, [city])
 
     function makePreview(files) {
         return files.map(f => ({
@@ -87,7 +108,7 @@ export default function AdminCreatePage() {
         e.preventDefault()
         setMsg('')
         if (!name.trim()) { setMsg('Enter a name'); return }
-        if (!city.trim()) { setMsg('Enter a city'); return }
+        if (!city.trim()) { setMsg('Select a city'); return }
         if (profileFiles.length < 1) { setMsg('Upload at least 1 profile image'); return }
 
         setLoading(true)
@@ -111,7 +132,7 @@ export default function AdminCreatePage() {
                 profileFiles.forEach(i => i.url && URL.revokeObjectURL(i.url))
                 variantFiles.forEach(i => i.url && URL.revokeObjectURL(i.url))
                 setProfileFiles([]); setVariantFiles([])
-                setName(''); setCity(''); setAge(''); setPrice(''); setDescription('')
+                setName(''); setCity(cities?.[0]?.slug || ''); setAge(''); setPrice(''); setDescription('')
             } else {
                 setMsg(j?.message || 'Upload failed')
             }
@@ -124,7 +145,9 @@ export default function AdminCreatePage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-zinc-900 text-black dark:text-white">
+        <>
+          <Head><title>Create Listing - Admin</title></Head>
+          <div className="min-h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-zinc-900 text-black dark:text-white">
             <Sidebar />
 
             <main className="flex-1 p-6 md:p-10">
@@ -134,19 +157,30 @@ export default function AdminCreatePage() {
 
                     <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input className="input py-2 px-2" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
-                        <input className="input py-2 px-2" placeholder="City" value={city} onChange={e => setCity(e.target.value)} />
+                        
+                        {/* SSR-populated dropdown */}
+                        <div>
+                          <label className="block text-sm mb-1">City</label>
+                          <select value={city} onChange={e => setCity(e.target.value)} className="w-full border rounded px-3 py-2">
+                            {cities && cities.length ? cities.map(c => (
+                              <option key={c.slug} value={c.slug}>{c.name}</option>
+                            )) : (
+                              <option value="">No cities — create one in Admin → Create City</option>
+                            )}
+                          </select>
+                        </div>
+
                         <input className="input py-2 px-2" placeholder="Age" value={age} onChange={e => setAge(e.target.value)} />
                         <input className="input py-2 px-2" placeholder="Price" value={price} onChange={e => setPrice(e.target.value)} />
 
 
-                        {/* PROFILE IMAGES */}
-                      
-
+                        {/* DESCRIPTION (rich) */}
                         <div className="md:col-span-2">
-                              <RichTextEditor
-                            value={description}
-                            onChange={setDescription}
-                        />
+                            <RichTextEditor value={description} onChange={setDescription} />
+                        </div>
+
+                        {/* PROFILE IMAGES */}
+                        <div className="md:col-span-2">
                             <label className="block text-sm mb-2">Profile Images (drag-drop or select)</label>
                             <div
                                 onDrop={(e) => handleDrop(e, 'profile')}
@@ -179,7 +213,6 @@ export default function AdminCreatePage() {
                             </div>
                         </div>
 
-
                         {/* VARIANT IMAGES */}
                         <div className="md:col-span-2">
                             <label className="block text-sm mb-2">Variant Images (optional)</label>
@@ -211,16 +244,35 @@ export default function AdminCreatePage() {
                         </div>
 
                         <div className="md:col-span-2 flex items-center gap-3">
-
                             <button disabled={loading} className="bg-black text-white px-5 py-2 rounded hover:bg-yellow-400 hover:text-black transition">
                                 {loading ? 'Publishing...' : 'Publish Listing'}
                             </button>
                             {msg && <div className="text-sm text-yellow-400">{msg}</div>}
                         </div>
-
                     </form>
                 </div>
             </main>
-        </div>
+          </div>
+        </>
     )
+}
+
+// SSR: fetch cities so dropdown is server-rendered
+export async function getServerSideProps(ctx) {
+  const { req } = ctx;
+  const protocol = req.headers["x-forwarded-proto"] || "http";
+  const host = req.headers.host;
+  const base = `${protocol}://${host}`;
+
+  try {
+    const res = await fetch(`${base}/api/admin/cities`);
+    const j = await res.json();
+    if (j?.ok && j.cities) {
+      return { props: { initialCities: j.cities } };
+    }
+  } catch (e) {
+    console.error("getServerSideProps cities fetch error", e);
+  }
+
+  return { props: { initialCities: [] } };
 }

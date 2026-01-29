@@ -11,6 +11,7 @@ export default function Sidebar({ className }) {
     { href: '/admin/dashboard', label: 'Dashboard' },
     { href: '/admin/create', label: 'Create Listing' },
     { href: '/admin/allListing', label: 'All Listings' },
+    { href: '/admin/createCity', label: 'Create City' },
     { href: '/admin/settings', label: 'Settings' },
   ]
 
