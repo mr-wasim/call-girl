@@ -10,33 +10,55 @@ if (!cached) cached = global._mongooseConnection = { conn: null, promise: null }
 async function connect() {
   if (cached.conn) return cached.conn;
   if (!MONGODB_URI) throw new Error("Please set MONGODB_URI or MONGO_URI");
-  if (!cached.promise) cached.promise = mongoose.connect(MONGODB_URI).then(m => m);
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URI).then(m => m);
+  }
   cached.conn = await cached.promise;
   return cached.conn;
 }
 
 function slugify(s){
-  return s.toString().toLowerCase().trim().replace(/[\s\W-]+/g,'-').replace(/^-+|-+$/g,'')
+  return s
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[\s\W-]+/g,'-')
+    .replace(/^-+|-+$/g,'');
 }
 
 export default async function handler(req,res){
   try{
     await connect();
 
+    // ========= GET =========
     if (req.method === "GET") {
       const cities = await City.find({}).sort({ name: 1 }).lean();
       return res.status(200).json({ ok: true, cities });
     }
 
+    // ========= POST =========
     if (req.method === "POST") {
       const { name, descriptionHtml } = req.body || {};
-      if (!name || !name.trim()) return res.status(400).json({ ok:false, message: "City name required" });
-      const slug = slugify(name);
-      let finalSlug = slug, counter = 1;
-      while (await City.findOne({ slug: finalSlug })) finalSlug = `${slug}-${counter++}`;
-      const c = new City({ name: name.trim(), slug: finalSlug, descriptionHtml: descriptionHtml || "" });
-      await c.save();
-      return res.status(201).json({ ok:true, city: c });
+      if (!name || !name.trim()) {
+        return res.status(400).json({ ok:false, message: "City name required" });
+      }
+
+      const baseSlug = slugify(name);
+      let finalSlug = baseSlug;
+      let counter = 1;
+
+      while (await City.findOne({ slug: finalSlug })) {
+        finalSlug = `${baseSlug}-${counter++}`;
+      }
+
+      const city = await City.create({
+        name: name.trim(),
+        slug: finalSlug,
+        descriptionHtml: descriptionHtml || "",
+        createdBy: "admin",
+      });
+
+      return res.status(201).json({ ok:true, city });
     }
 
     res.setHeader("Allow", ["GET","POST"]);
